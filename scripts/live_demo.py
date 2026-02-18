@@ -189,7 +189,7 @@ def run_live_demo():
     vitals = {}
     frame_count = 0
     last_inference_time = time.time()
-    inference_interval = 1.0  # Run inference every 1 second
+    inference_interval = config["live_demo"].get("inference_interval_seconds", 1.0)  # Run inference periodically
 
     while True:
         ret, frame = cap.read()
@@ -216,7 +216,7 @@ def run_live_demo():
             buffer_percent = (len(frame_buffer) / buffer_size) * 100
 
             # Run inference if enough data and time elapsed
-            min_frames = int(3 * config["live_demo"]["frame_rate"])  # At least 3 seconds
+            min_frames = int(config["live_demo"].get("min_buffer_seconds", 3) * config["live_demo"]["frame_rate"])
             current_time = time.time()
 
             if len(frame_buffer) >= min_frames and (current_time - last_inference_time) >= inference_interval:

@@ -47,3 +47,5 @@ live_demo:
   frame_rate: 30
   display_width: 640
   display_height: 480
+  inference_interval_seconds: 1.0
+  min_buffer_seconds: 3
