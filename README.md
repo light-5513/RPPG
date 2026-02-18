@@ -9,7 +9,6 @@ This project implements an rPPG system that estimates heart rate from video by d
 ## 🗂️ Project Structure
 
 ```
-V1/
 ├── datasets/
 │   └── ubfc-rppg/          # Downloaded dataset goes here
 ├── models/
@@ -37,9 +36,9 @@ V1/
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10
 - Webcam or smartphone with DroidCam (for live demo)
-- GPU recommended for training (CUDA-compatible)
+- CPU supported (GPU optional for faster training)
 
 ### Installation
 
@@ -53,6 +52,8 @@ V1/
 3. **Configure Kaggle API** (for dataset download):
    - Create a Kaggle account and generate API token
    - Place `kaggle.json` in `~/.kaggle/` directory
+
+**Note:** This project supports GitHub Codespaces for easy cloud-based training without local setup requirements.
 
 ## 📊 Dataset
 

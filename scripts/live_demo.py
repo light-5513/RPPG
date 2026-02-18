@@ -139,4 +139,148 @@ def draw_signal_plot(frame, signal_buffer, fps=30):
 
 
 def run_live_demo():
-    """Run real-time rP"""
+    """Run real-time rPPG demo with vitals monitoring."""
+    print("=" * 60)
+    print("🫀 Real-time rPPG Vitals Monitor")
+    print("=" * 60)
+
+    # Load configuration
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "config.yaml")
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    # Initialize components
+    print("\n📦 Loading components...")
+    model, device = load_model(config)
+    face_extractor = FaceROIExtractor(roi_size=config["model"]["img_size"])
+    signal_processor = SignalProcessor(fps=config["live_demo"]["frame_rate"])
+
+    # Initialize camera
+    camera_source = config["live_demo"]["camera_source"]
+    print(f"📹 Connecting to camera: {camera_source}")
+    
+    cap = cv2.VideoCapture(camera_source)
+    
+    # If DroidCam URL fails, try webcam
+    if not cap.isOpened():
+        print("⚠️  DroidCam URL failed, trying webcam index 0...")
+        camera_source = 0
+        cap = cv2.VideoCapture(camera_source)
+    
+    if not cap.isOpened():
+        print("❌ Could not open camera!")
+        return
+
+    # Set camera properties
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, config["live_demo"]["display_width"])
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config["live_demo"]["display_height"])
+
+    print("✅ Camera connected successfully")
+    print(f"Buffer: {config['live_demo']['buffer_seconds']} seconds")
+    print(f"Frame rate: {config['live_demo']['frame_rate']} fps")
+    print("\nPress 'q' to quit\n")
+
+    # Buffers for frames and signals
+    buffer_size = config["live_demo"]["buffer_seconds"] * config["live_demo"]["frame_rate"]
+    frame_buffer = deque(maxlen=buffer_size)
+    rgb_buffer = deque(maxlen=buffer_size)
+    rppg_signal_buffer = deque(maxlen=buffer_size)
+
+    vitals = {}
+    frame_count = 0
+    last_inference_time = time.time()
+    inference_interval = 1.0  # Run inference every 1 second
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("⚠️  Failed to read frame")
+            break
+
+        frame_count += 1
+        display_frame = frame.copy()
+
+        # Extract face ROI
+        face_crop, rgb_mean, bbox = face_extractor.extract_face_roi(frame)
+
+        if face_crop is not None and rgb_mean is not None:
+            # Add to buffers
+            frame_buffer.append(face_crop)
+            rgb_buffer.append(rgb_mean)
+
+            # Draw face bounding box
+            x1, y1, x2, y2 = bbox
+            cv2.rectangle(display_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+            # Calculate buffer fill percentage
+            buffer_percent = (len(frame_buffer) / buffer_size) * 100
+
+            # Run inference if enough data and time elapsed
+            min_frames = int(3 * config["live_demo"]["frame_rate"])  # At least 3 seconds
+            current_time = time.time()
+
+            if len(frame_buffer) >= min_frames and (current_time - last_inference_time) >= inference_interval:
+                last_inference_time = current_time
+
+                try:
+                    # Prepare frames for model
+                    frames_np = np.array(list(frame_buffer))  # (T, H, W, 3)
+                    
+                    # Convert to torch tensor and normalize
+                    frames_tensor = torch.from_numpy(frames_np).float()
+                    frames_tensor = frames_tensor.permute(0, 3, 1, 2)  # (T, 3, H, W)
+                    frames_tensor = frames_tensor / 255.0
+
+                    # Add batch dimension
+                    frames_tensor = frames_tensor.unsqueeze(0)  # (1, T, 3, H, W)
+
+                    # Run model inference
+                    with torch.no_grad():
+                        predicted_signal = model(frames_tensor)  # (1, T)
+                        predicted_signal = predicted_signal.squeeze().cpu().numpy()
+
+                    # Update rPPG signal buffer
+                    for sig_val in predicted_signal:
+                        rppg_signal_buffer.append(sig_val)
+
+                    # Extract vitals
+                    rppg_array = np.array(list(rppg_signal_buffer))
+                    rgb_array = np.array(list(rgb_buffer))
+                    
+                    vitals = signal_processor.extract_all_vitals(rppg_array, rgb_array)
+
+                except Exception as e:
+                    print(f"⚠️  Inference error: {e}")
+                    vitals = {}
+
+            # Draw vitals panel
+            display_frame = draw_vitals(display_frame, vitals, buffer_percent)
+
+            # Draw signal plot
+            if len(rppg_signal_buffer) > 0:
+                display_frame = draw_signal_plot(display_frame, list(rppg_signal_buffer), 
+                                                 fps=config["live_demo"]["frame_rate"])
+
+        else:
+            # No face detected
+            h, w = display_frame.shape[:2]
+            cv2.putText(display_frame, "No face detected", (w // 2 - 150, h // 2),
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+
+        # Display frame
+        cv2.imshow("rPPG Live Demo - Press 'q' to quit", display_frame)
+
+        # Check for quit key
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # Cleanup
+    print("\n🛑 Shutting down...")
+    cap.release()
+    cv2.destroyAllWindows()
+    face_extractor.close()
+    print("✅ Demo ended successfully")
+
+
+if __name__ == "__main__":
+    run_live_demo()
