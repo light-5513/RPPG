@@ -136,6 +136,10 @@ def train():
     print(f"Train samples: {len(train_dataset)}")
     print(f"Val samples: {len(val_dataset)}")
 
+    if len(train_dataset) == 0:
+        print("ERROR: No training samples found. Run 'python scripts/preprocess.py' first.")
+        sys.exit(1)
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=tc["batch_size"],

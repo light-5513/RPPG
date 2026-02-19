@@ -30,7 +30,7 @@ training:
   weight_decay: 0.00001
   scheduler_step: 10
   scheduler_gamma: 0.5
-  num_workers: 2
+  num_workers: 0
   device: "cpu"
   save_path: "models/saved"
   log_path: "outputs/logs"
@@ -42,7 +42,7 @@ evaluation:
 
 # ---- Live Demo ----
 live_demo:
-  camera_source: "http://192.168.1.100:4747/video"
+  camera_source: "http://10.16.62.201/video"
   buffer_seconds: 10
   frame_rate: 30
   display_width: 640

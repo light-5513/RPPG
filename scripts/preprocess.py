@@ -19,17 +19,24 @@ def load_ground_truth(gt_path):
     """Load ground truth PPG signal from UBFC-rPPG format."""
     gt_data = np.loadtxt(gt_path)
 
-    # UBFC-rPPG ground_truth.txt format:
-    # Column 0: PPG signal (from pulse oximeter)
-    # Column 1: Heart rate
-    # Column 2: Timestamps (sometimes)
+    # UBFC-rPPG ground_truth.txt format (each row is a channel, columns are time):
+    # Row 0: PPG signal (from pulse oximeter)
+    # Row 1: Heart rate
+    # Row 2: Timestamps (sometimes)
 
     if gt_data.ndim == 1:
         ppg_signal = gt_data
         hr_values = None
     else:
-        ppg_signal = gt_data[:, 0]
-        hr_values = gt_data[:, 1] if gt_data.shape[1] > 1 else None
+        # Data is (num_channels, num_frames) — rows are channels
+        if gt_data.shape[0] <= 5 and gt_data.shape[1] > gt_data.shape[0]:
+            # Shape like (3, N): rows are channels, columns are time points
+            ppg_signal = gt_data[0, :]
+            hr_values = gt_data[1, :] if gt_data.shape[0] > 1 else None
+        else:
+            # Shape like (N, 3): rows are time points, columns are channels
+            ppg_signal = gt_data[:, 0]
+            hr_values = gt_data[:, 1] if gt_data.shape[1] > 1 else None
 
     return ppg_signal, hr_values
 
